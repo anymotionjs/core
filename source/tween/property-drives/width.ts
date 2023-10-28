@@ -1,43 +1,36 @@
-import type { TweenPropertyDrive } from '..'
+import type { TweenPropertyDriveCreator } from '../index'
+import { splitNumberUnit, createNumberInterpolate, isHTMLElementType } from './common'
 
 declare global {
   interface TweenProperties {
-    width?: number | string
+    /** 宽度；例如：100px, 支持所有 css 单位，但请保证 from 和 to 单位一致 */
+    width?: string
   }
 }
 
-export const width: TweenPropertyDrive = {
-  transform: (propertiesPair, progress, element) => {
-    const { from, to } = propertiesPair
-    const { width: fromWidth } = from || {}
-    const { width: toWidth } = to
+function getRawWidth(element: Element): string {
+  const style = window.getComputedStyle(element, null)
+  return style.width
+}
 
-    if (typeof fromWidth !== 'undefined' && typeof toWidth !== 'undefined') {
-      const currentValue = calculateCurrentValue(fromWidth, toWidth, progress)
-      element.style.width = `${currentValue}`
+export const width: TweenPropertyDriveCreator = ({ from, to }, element) => {
+  if (!isHTMLElementType(element)) return null
+
+  const rawWidth = getRawWidth(element)
+
+  const localTo = to?.width ?? rawWidth
+  const localFrom = from?.width ?? rawWidth
+
+  const [toWidth, toUnit] = splitNumberUnit(localTo)
+  const [fromWidth, formUnit] = splitNumberUnit(localFrom)
+  if (toUnit !== formUnit) throw new Error('The from and to units of width must be consistent.')
+
+  const interpolate = createNumberInterpolate(fromWidth, toWidth, { decimalPlaces: 2 })
+
+  return {
+    transform(progress) {
+      const currentValue = interpolate(progress)
+      element.style.width = `${currentValue}${toUnit}`
     }
   }
-}
-
-// 辅助函数：根据动画进度计算当前值
-function calculateCurrentValue(fromValue: number | string, toValue: number | string, progress: number): number | string {
-  const numericFromValue = toNumericValue(fromValue)
-  const numericToValue = toNumericValue(toValue)
-
-  if (typeof numericFromValue === 'number' && typeof numericToValue === 'number') {
-    const range = numericToValue - numericFromValue
-    return numericFromValue + range * progress
-  } else {
-    return toValue
-  }
-}
-
-// 辅助函数：将值转换为数值形式
-function toNumericValue(value: number | string): number | undefined {
-  if (typeof value === 'number') {
-    return value
-  } else if (typeof value === 'string' && /^[\d.-]+$/.test(value)) {
-    return parseFloat(value)
-  }
-  return undefined
 }

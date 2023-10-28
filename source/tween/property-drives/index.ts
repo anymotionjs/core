@@ -1,4 +1,4 @@
-export * from './background'
+export * from './background-color'
 export * from './height'
 export * from './rotate'
 export * from './scale'
