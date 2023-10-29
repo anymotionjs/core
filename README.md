@@ -1,2 +1,3 @@
-# parallax
-A dependency-free parallax effect library
+# @anymotion/html-driver
+
+anymotion core package

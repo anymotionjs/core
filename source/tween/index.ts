@@ -1,12 +1,12 @@
 import { Time } from '../time'
-import * as drives from './property-drives'
+import { pluginManager } from '../plugin'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-empty-interface
   interface TweenProperties {}
 }
 
-export type TweenPropertyDriveCreator = (
+export type TweenPropertyDriver = (
   propertiesPair: TweenPropertiesPair,
   element: Element
 ) => TweenPropertyDrive | null
@@ -26,7 +26,6 @@ export class Tween {
   private _to: TweenProperties = {}
   private _from: TweenProperties = {}
   private _propertyDrives: TweenPropertyDrive[] = []
-  private _propertyDriveCreators = Object.values(drives)
 
   constructor(elementSelector: string | Element) {
     if (elementSelector instanceof Element) {
@@ -53,7 +52,7 @@ export class Tween {
 
     const newDrives: TweenPropertyDrive[] = []
     const pair = { from: this._from, to: this._to }
-    for (const creator of this._propertyDriveCreators) {
+    for (const creator of pluginManager.getTweenPropertyDrivers()) {
       for (const element of this._elements) {
         const driver = creator(pair, element)
         if (driver != null) newDrives.push(driver)

@@ -1,6 +1,7 @@
 {
-  "name": "animjs",
+  "name": "@anymotion/core",
   "version": "0.0.1",
+  
   "description": "",
   "types": "./output/index.d.ts",
   "exports": {
