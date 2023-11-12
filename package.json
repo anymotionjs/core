@@ -1,7 +1,6 @@
 {
   "name": "@anymotion/core",
-  "version": "0.0.1",
-  
+  "version": "0.1.0",
   "description": "",
   "types": "./output/index.d.ts",
   "exports": {
