@@ -23,20 +23,19 @@ interface TweenPropertiesPair {
 }
 
 function findAdjacentNumbers(arr: number[], num: number): [number, number] {
-  const adjacentNumbers: [number, number] = [0, 1]
+  const result: number[] = []
   const sortedArr = arr.sort((a, b) => a - b)
 
-  for (let i = 0; i < sortedArr.length; i++) {
-    if (sortedArr[i] > num) {
-      adjacentNumbers[1] = sortedArr[i]
-      // 碰到第一个比 num 大的就跳出循环
-      break
-    }
+  for (let i = 1; i < sortedArr.length; i++) {
+    const prevValue = sortedArr[i - 1]
+    const nextValue = sortedArr[i]
 
-    adjacentNumbers[0] = sortedArr[i]
+    if (num >= prevValue && num < nextValue) result.push(prevValue, nextValue)
+    if (num > prevValue && num <= nextValue) result.push(prevValue, nextValue)
   }
 
-  return adjacentNumbers
+  if (result.length < 2) throw new Error('??')
+  return [result[result.length - 2], result[result.length - 1]]
 }
 
 function tweenRelativePropertyDrive(drive: TweenPropertyDrive, range: [number, number]): TweenPropertyDrive {
@@ -45,6 +44,7 @@ function tweenRelativePropertyDrive(drive: TweenPropertyDrive, range: [number, n
       const [from, to] = range
       const totalDuration = to - from
       const relativeProgress = (progress - from) / totalDuration
+      if (!Number.isFinite(relativeProgress)) throw new Error('Progress is not finite')
       drive.drive(relativeProgress)
     }
   }
