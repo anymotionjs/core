@@ -1,4 +1,4 @@
-import type { EasingFunction } from '.'
+import type { EasingFunction } from './type'
 
 // 计算贝塞尔插值
 function computedBezier(t: number, controlPoints: number[]): number {

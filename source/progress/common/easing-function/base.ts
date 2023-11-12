@@ -1,4 +1,4 @@
-import type { EasingFunction } from '.'
+import type { EasingFunction } from './type'
 
 // 线性缓动函数
 export const linear: EasingFunction = (t: number) => t

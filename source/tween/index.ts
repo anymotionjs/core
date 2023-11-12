@@ -1,5 +1,7 @@
-import { Time } from '../time'
+
+import { createElementSelector } from '../helps'
 import { pluginManager } from '../plugin'
+import { Drivable } from '../progress'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -12,7 +14,7 @@ export type TweenPropertyDriver = (
 ) => TweenPropertyDrive | null
 
 export interface TweenPropertyDrive {
-  transform: (progress: number) => void
+  drive: (progress: number) => void
 }
 
 interface TweenPropertiesPair {
@@ -20,60 +22,105 @@ interface TweenPropertiesPair {
   to?: TweenProperties
 }
 
-export class Tween {
-  public time = new Time()
-  private _elements: Element[] = []
-  private _to: TweenProperties = {}
-  private _from: TweenProperties = {}
-  private _propertyDrives: TweenPropertyDrive[] = []
+function findAdjacentNumbers(arr: number[], num: number): [number, number] {
+  const adjacentNumbers: [number, number] = [0, 1]
+  const sortedArr = arr.sort((a, b) => a - b)
 
-  constructor(elementSelector: string | Element) {
-    if (elementSelector instanceof Element) {
-      this._elements.push(elementSelector)
+  for (let i = 0; i < sortedArr.length; i++) {
+    if (sortedArr[i] > num) {
+      adjacentNumbers[1] = sortedArr[i]
+      // 碰到第一个比 num 大的就跳出循环
+      break
     }
 
-    if (typeof elementSelector === 'string') {
-      this._elements.push(...document.querySelectorAll(elementSelector))
-    }
-
-    this.time.listen(progress => {
-      if (this._elements.length === 0) return
-      if (this._propertyDrives.length === 0) return
-      for (const drive of this._propertyDrives) {
-        drive.transform(progress)
-      }
-    })
+    adjacentNumbers[0] = sortedArr[i]
   }
 
-  private createDrives() {
-    if (this._elements == null) return
-    if (this._from == null && this._to == null) return // 不能都为 null
-    if (Object.keys(this._from).length === 0 && Object.keys(this._to).length === 0) return // 不能都为空对象 {}
+  return adjacentNumbers
+}
 
-    const newDrives: TweenPropertyDrive[] = []
-    const pair = { from: this._from, to: this._to }
-    for (const creator of pluginManager.getTweenPropertyDrivers()) {
-      for (const element of this._elements) {
-        const driver = creator(pair, element)
-        if (driver != null) newDrives.push(driver)
+function tweenRelativePropertyDrive(drive: TweenPropertyDrive, range: [number, number]): TweenPropertyDrive {
+  const proxy: TweenPropertyDrive = {
+    drive(progress) {
+      const [from, to] = range
+      const totalDuration = to - from
+      const relativeProgress = (progress - from) / totalDuration
+      drive.drive(relativeProgress)
+    }
+  }
+
+  Object.setPrototypeOf(proxy, drive)
+  return proxy
+}
+
+export class Tween implements Drivable {
+  private _elementSelector = createElementSelector()
+  private _keyFrames = new Map<number, TweenProperties>()
+  private _propertyDrives = new Map<number, TweenPropertyDrive[]>()
+
+  constructor(...elementSelector: Array<string | Element>) {
+    this._elementSelector.setSelector(...elementSelector)
+  }
+
+  private getPropertyDrives(progress: number): TweenPropertyDrive[] {
+    if (!this._keyFrames.has(0)) this._keyFrames.set(0, {})
+    if (!this._keyFrames.has(1)) this._keyFrames.set(1, {})
+
+    const keys = Array.from(this._keyFrames.keys())
+    const [fromProgress, toProgress] = findAdjacentNumbers(keys, progress)
+
+    const toProperty = this._keyFrames.get(toProgress)
+    const fromProperty = this._keyFrames.get(fromProgress)
+    const toPropertyDrives = this._propertyDrives.get(toProgress) || []
+    // 查找当前区间的动画（不存在则创建）
+    if (toPropertyDrives.length === 0) {
+      const elements = this._elementSelector.getElements()
+      for (const driver of pluginManager.getTweenPropertyDrivers()) {
+        for (const element of elements) {
+          const drive = driver({ from: fromProperty, to: toProperty }, element)
+          // 通过 tweenRelativePropertyDrive 将 progress 映射成局部的 progress
+          if (drive != null) toPropertyDrives.push(tweenRelativePropertyDrive(drive, [fromProgress, toProgress]))
+        }
       }
+
+      this._propertyDrives.set(toProgress, toPropertyDrives)
     }
 
-    this._propertyDrives = newDrives
+    const result = this._propertyDrives.get(toProgress) || []
+    return result
+  }
+
+  progress(v: number) {
+    if (this._elementSelector.getElements().length === 0) return
+
+    const propertyDrives = this.getPropertyDrives(v)
+    for (const drive of propertyDrives) {
+      drive.drive(v)
+    }
   }
 
   to(properties: TweenProperties): Tween {
-    this._to = properties
-    this.createDrives()
+    this.addKeyFrame(1, properties)
     return this
   }
 
   from(properties: TweenProperties): Tween {
-    this._from = properties
-    this.createDrives()
+    this.addKeyFrame(0, properties)
+    return this
+  }
+
+  addKeyFrame(progress: number, properties: TweenProperties): Tween
+  addKeyFrame(progress: number[], properties: TweenProperties): Tween
+  addKeyFrame(progress: number[] | number, properties: TweenProperties): Tween {
+    if (Object.keys(properties).length === 0) throw new Error('??')
+
+    const progressArray = Array.isArray(progress) ? progress : [progress]
+    for (const progress of progressArray) {
+      this._keyFrames.set(progress, properties)
+    }
+
+    // 更新了 keyFrames 则重新生成 Drives
+    this._propertyDrives.clear()
     return this
   }
 }
-
-export type TweenTo = (typeof Tween.prototype)['to']
-export type TweenForm = (typeof Tween.prototype)['from']
